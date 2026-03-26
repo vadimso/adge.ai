@@ -1,0 +1,186 @@
+├── backend/
+│   ├── main.py             # FastAPI backend API server
+│   ├── requirements.txt    # Python dependencies
+│   └── Dockerfile          # Dockerfile for Cloud Run
+├── worker/
+│   ├── worker.py           # FastAPI worker processing jobs
+│   ├── requirements.txt    # Python dependencies
+│   └── Dockerfile          # Dockerfile for Cloud Run
+└── frontend/
+    ├── package.json        # React dependencies and scripts
+    ├── public/
+    │   └── index.html      # HTML entry point
+    └── src/
+        ├── index.jsx       # React root render
+        └── App.jsx         # React component for demo UI
+
+
+Prerequisites
+
+GCP Account with the following APIs enabled:
+
+Cloud Run
+
+Cloud Tasks
+
+Cloud Storage
+
+Firestore (Native mode)
+
+Python 3.11+ (backend/worker)
+
+Node.js 18+ (frontend)
+
+Docker for building images
+
+Optional: gcloud CLI for deployment
+
+1️⃣ Setup GCP Resources
+Set project
+gcloud config set project YOUR_PROJECT_ID
+
+Create Cloud Storage bucket (for export/import files):
+
+gsutil mb -l us-central1 gs://demo-export-bucket
+
+Enable Firestore in Native mode (default location)
+
+Create Cloud Tasks queue:
+
+gcloud tasks queues create export-queue --location=us-central1
+
+Note your GCP Project ID, region, and Cloud Run URLs for backend and worker.
+
+gcloud iam service-accounts create export-sa
+
+
+2️⃣ Backend Deployment (FastAPI)
+
+Navigate to backend:
+
+cd backend
+
+Build Docker image:
+
+docker build -t export-api .
+gcloud auth configure-docker
+
+docker tag export-api gcr.io/YOUR_PROJECT_ID/export-api
+docker push gcr.io/YOUR_PROJECT_ID/export-api
+
+gcloud run deploy export-api \
+  ... \
+  --service-account export-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com
+
+gcloud iam service-accounts create export-sa
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:export-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:export-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/storage.admin"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:export-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/cloudtasks.enqueuer"
+
+
+
+Deploy to Cloud Run:
+
+gcloud run deploy export-api \
+  --image gcr.io/YOUR_PROJECT_ID/export-api \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated
+
+Copy the Cloud Run URL and update WORKER_URL in main.py to point to your worker endpoint.
+
+3️⃣ Worker Deployment (FastAPI)
+
+Navigate to worker:
+
+cd worker
+
+Build Docker image:
+
+docker build -t export-worker .
+
+docker tag export-worker gcr.io/YOUR_PROJECT_ID/export-worker
+docker push gcr.io/YOUR_PROJECT_ID/export-worker
+
+gcloud run deploy export-worker \
+  ... \
+  --service-account export-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com
+
+Deploy to Cloud Run:
+
+gcloud run deploy export-worker \
+  --image gcr.io/YOUR_PROJECT_ID/export-worker \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated
+
+  
+4️⃣ Frontend Deployment (React)
+
+Navigate to frontend:
+
+cd frontend
+
+Install dependencies:
+
+npm install
+
+Build frontend:
+
+npm run build
+
+Serve locally for testing:
+
+npx serve -s build
+
+Replace YOUR_BACKEND_CLOUD_RUN_URL in App.jsx with your backend URL.
+
+Optionally, deploy frontend to Cloud Run or Firebase Hosting.
+
+5️⃣ Usage
+
+Open the frontend in browser.
+
+Click Start Export → backend generates a job ID and enqueues a task.
+
+The frontend polls the backend /api/jobs/{job_id}/status.
+
+Once done, a signed download URL appears → click to download the mock export JSON file.
+
+For import, extend backend and worker to accept file uploads via Cloud Storage.
+
+6️⃣ Load Testing
+
+You can simulate multiple export requests using the provided Python async load test:
+
+python load_test.py
+
+Adjust TOTAL_REQUESTS and CONCURRENT_REQUESTS to test system load.
+
+Monitor Cloud Tasks queue, Cloud Run worker metrics, and Firestore job statuses to ensure proper scaling.
+
+7️⃣ Features
+
+Fully asynchronous export/import using Cloud Tasks and Cloud Run
+
+Handles large payloads without blocking the web server
+
+Uses signed URLs for secure downloads
+
+Supports scalable worker processing
+
+Easy to extend for real-world data
+
+8️⃣ Notes
+
+Check export with load_test.py (before run pip install aiohttp)
+
