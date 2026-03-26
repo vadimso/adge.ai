@@ -1,7 +1,7 @@
 {
   "type": "service_account",
   "project_id": "gcp-lab-490622",
-  "private_key_id": "27225cac4380d801a9a36f242f99007be4ae6a83",
+  "private_key_id": "",
   "private_key": 
   "client_email": "export-sa@gcp-lab-490622.iam.gserviceaccount.com",
   "client_id": "",
